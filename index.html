@@ -14,12 +14,12 @@
 
       // 抓 URL 參數
       const params = new URLSearchParams(window.location.search);
-      const agt = params.get('uagt') || 'none';
+      const uagt = params.get('uagt') || 'none';
       const path = params.get('path') || 'none';
 
       // 傳送自訂事件
       gtag('event', 'landing_from_url', {
-        agt: uagt,
+        uagt: uagt,
         path: path
       });
     </script>
