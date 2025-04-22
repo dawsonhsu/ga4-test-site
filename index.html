@@ -64,17 +64,22 @@
       payload.push("000201");
       payload.push("010211");
 
-      const accountInfo = `0010A0000007270128${bankCode}${account}`;
-      payload.push(`38${padLength(accountInfo.length)}${accountInfo}`);
+      // Merchant Account Info (Tag 38)
+      const bankData = `${bankCode}${account}`;
+      const tag00 = "0010A000000727";
+      const tag01 = `01${padLength(bankData.length)}${bankData}`;
+      const value38 = `${tag00}${tag01}`;
+      payload.push(`38${padLength(value38.length)}${value38}`);
 
-      payload.push(`0208QRIBFTTA`);
+      payload.push("0208QRIBFTTA");
       payload.push("5303704");
+
       if (amount) payload.push(`54${padLength(amount.length)}${amount}`);
       payload.push("5802VN");
 
       if (message) {
-        const info = `05${padLength(message.length)}${message}`;
-        payload.push(`62${padLength(info.length)}${info}`);
+        const messageTag = `05${padLength(message.length)}${message}`;
+        payload.push(`62${padLength(messageTag.length)}${messageTag}`);
       }
 
       let base = payload.join("");
