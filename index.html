@@ -7,14 +7,23 @@
   <style>
     body { font-family: sans-serif; padding: 2em; }
     label { display: block; margin-top: 1em; }
-    input { width: 300px; padding: 5px; }
+    input, select { width: 300px; padding: 5px; }
     #qrcode { margin-top: 2em; }
   </style>
 </head>
 <body>
   <h2>NAPAS / VietQR Code 生成器</h2>
   <form id="qrForm">
-    <label>銀行代碼（acqId，例如 970415）<input id="bankCode" required></label>
+    <label>銀行代碼：
+      <select id="bankCode" required>
+        <option value="970415">VietinBank</option>
+        <option value="970436">Vietcombank</option>
+        <option value="970418">Techcombank</option>
+        <option value="970407">BIDV</option>
+        <option value="970422">MB Bank</option>
+        <option value="970405">Agribank</option>
+      </select>
+    </label>
     <label>銀行帳號（account number）<input id="accountNumber" required></label>
     <label>帳戶名稱（請使用英文大寫無聲調）<input id="accountName" required></label>
     <label>金額（VND，可選）<input id="amount" type="number"></label>
