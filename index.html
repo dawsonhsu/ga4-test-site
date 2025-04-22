@@ -62,12 +62,12 @@
       const payload = [];
 
       payload.push("000201");
-      payload.push("010211");
+      payload.push("010212"); // 靜態 QR
 
       // Merchant Account Info (Tag 38)
-      const bankData = `${bankCode}${account}`;
+      const fullAcct = `0006${bankCode}${account}`;
       const tag00 = "0010A000000727";
-      const tag01 = `01${padLength(bankData.length)}${bankData}`;
+      const tag01 = `01${padLength(fullAcct.length)}${fullAcct}`;
       const value38 = `${tag00}${tag01}`;
       payload.push(`38${padLength(value38.length)}${value38}`);
 
