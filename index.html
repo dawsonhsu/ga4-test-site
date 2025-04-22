@@ -4,11 +4,13 @@
   <meta charset="UTF-8">
   <title>NAPAS VietQR 生成器</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
     body { font-family: sans-serif; padding: 2em; }
     label { display: block; margin-top: 1em; }
     input, select { width: 300px; padding: 5px; }
-    #qrcode { margin-top: 2em; }
+    #qrcode, #payloadOutput, #breakdown, #verifyResult { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
+    #uploadSection { margin-top: 2em; }
   </style>
 </head>
 <body>
@@ -32,6 +34,15 @@
   </form>
 
   <div id="qrcode"></div>
+  <div id="payloadOutput"></div>
+  <div id="verifyResult"></div>
+  <div id="breakdown"></div>
+
+  <div id="uploadSection">
+    <h3>🖼️ 上傳 QR 圖片解析：</h3>
+    <input type="file" id="qrImageInput" accept="image/*">
+    <canvas id="qrCanvas" style="display:none;"></canvas>
+  </div>
 
   <script>
     function padLength(n) {
@@ -51,6 +62,27 @@
       return crc.toString(16).toUpperCase().padStart(4, '0');
     }
 
+    function breakdownPayload(payload) {
+      let pos = 0;
+      let breakdown = "\n🔍 Payload Breakdown:";
+      while (pos < payload.length) {
+        const tag = payload.substr(pos, 2);
+        const len = parseInt(payload.substr(pos + 2, 2), 10);
+        const value = payload.substr(pos + 4, len);
+        breakdown += `\nTag: ${tag}, Length: ${len}, Value: ${value}`;
+        pos += 4 + len;
+        if (tag === "63") break;
+      }
+      return breakdown;
+    }
+
+    function verifyCRC(payload) {
+      const base = payload.slice(0, -4);
+      const expected = payload.slice(-4);
+      const calc = crc16(base);
+      return `✅ CRC 檢查：${calc === expected ? '通過' : '❌ 錯誤'}\n實際：${expected}\n計算：${calc}`;
+    }
+
     document.getElementById("qrForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const bankCode = document.getElementById("bankCode").value.trim();
@@ -60,11 +92,9 @@
       const message = document.getElementById("message").value.trim();
 
       const payload = [];
-
       payload.push("000201");
-      payload.push("010212"); // 靜態 QR
+      payload.push("010212");
 
-      // Merchant Account Info (Tag 38)
       const fullAcct = `0006${bankCode}${account}`;
       const tag00 = "0010A000000727";
       const tag01 = `01${padLength(fullAcct.length)}${fullAcct}`;
@@ -73,7 +103,6 @@
 
       payload.push("0208QRIBFTTA");
       payload.push("5303704");
-
       if (amount) payload.push(`54${padLength(amount.length)}${amount}`);
       payload.push("5802VN");
 
@@ -91,6 +120,39 @@
       QRCode.toCanvas(document.createElement("canvas"), base, { width: 256 }, function (err, canvas) {
         if (!err) document.getElementById("qrcode").appendChild(canvas);
       });
+
+      document.getElementById("payloadOutput").innerText = `🧾 Payload:\n${base}`;
+      document.getElementById("verifyResult").innerText = verifyCRC(base);
+      document.getElementById("breakdown").innerText = breakdownPayload(base);
+    });
+
+    document.getElementById("qrImageInput").addEventListener("change", function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function() {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.getElementById("qrCanvas");
+          const ctx = canvas.getContext("2d");
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, canvas.width, canvas.height);
+          if (code) {
+            document.getElementById("payloadOutput").innerText = `🧾 解析內容：\n${code.data}`;
+            document.getElementById("verifyResult").innerText = verifyCRC(code.data);
+            document.getElementById("breakdown").innerText = breakdownPayload(code.data);
+          } else {
+            document.getElementById("payloadOutput").innerText = "❌ 無法解析 QR 碼";
+            document.getElementById("verifyResult").innerText = "";
+            document.getElementById("breakdown").innerText = "";
+          }
+        };
+        img.src = reader.result;
+      };
+      reader.readAsDataURL(file);
     });
   </script>
 </body>
