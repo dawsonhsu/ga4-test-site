@@ -9,7 +9,7 @@
     body { font-family: sans-serif; padding: 2em; }
     label { display: block; margin-top: 1em; }
     input, select { width: 300px; padding: 5px; }
-    #qrcode, #payloadOutput, #breakdown, #verifyResult { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
+    #qrcode, #payloadOutput, #breakdown, #verifyResult, #txInfo { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
     #uploadSection { margin-top: 2em; }
   </style>
 </head>
@@ -36,6 +36,7 @@
   <div id="qrcode"></div>
   <div id="payloadOutput"></div>
   <div id="verifyResult"></div>
+  <div id="txInfo"></div>
   <div id="breakdown"></div>
 
   <div id="uploadSection">
@@ -83,6 +84,37 @@
       return `✅ CRC 檢查：${calc === expected ? '通過' : '❌ 錯誤'}\n實際：${expected}\n計算：${calc}`;
     }
 
+    function extractTxInfo(payload) {
+      let bankCode = "";
+      let account = "";
+      let amount = "";
+      let message = "";
+      let pos = 0;
+      while (pos < payload.length) {
+        const tag = payload.substr(pos, 2);
+        const len = parseInt(payload.substr(pos + 2, 2), 10);
+        const value = payload.substr(pos + 4, len);
+        if (tag === "38") {
+          const subTag01Index = value.indexOf("01");
+          const subTag01Len = parseInt(value.substr(subTag01Index + 2, 2));
+          const full = value.substr(subTag01Index + 4, subTag01Len);
+          bankCode = full.substr(4, 6);
+          account = full.substr(10);
+        }
+        if (tag === "54") amount = value;
+        if (tag === "62") {
+          const msgIndex = value.indexOf("05");
+          if (msgIndex >= 0) {
+            const msgLen = parseInt(value.substr(msgIndex + 2, 2));
+            message = value.substr(msgIndex + 4, msgLen);
+          }
+        }
+        pos += 4 + len;
+        if (tag === "63") break;
+      }
+      return `📋 解析轉帳資訊：\n銀行代碼: ${bankCode}\n銀行帳號: ${account}\n金額(VND): ${amount || '（無）'}\n附言: ${message || '（無）'}`;
+    }
+
     document.getElementById("qrForm").addEventListener("submit", function(e) {
       e.preventDefault();
       const bankCode = document.getElementById("bankCode").value.trim();
@@ -123,6 +155,7 @@
 
       document.getElementById("payloadOutput").innerText = `🧾 Payload:\n${base}`;
       document.getElementById("verifyResult").innerText = verifyCRC(base);
+      document.getElementById("txInfo").innerText = extractTxInfo(base);
       document.getElementById("breakdown").innerText = breakdownPayload(base);
     });
 
@@ -143,10 +176,12 @@
           if (code) {
             document.getElementById("payloadOutput").innerText = `🧾 解析內容：\n${code.data}`;
             document.getElementById("verifyResult").innerText = verifyCRC(code.data);
+            document.getElementById("txInfo").innerText = extractTxInfo(code.data);
             document.getElementById("breakdown").innerText = breakdownPayload(code.data);
           } else {
             document.getElementById("payloadOutput").innerText = "❌ 無法解析 QR 碼";
             document.getElementById("verifyResult").innerText = "";
+            document.getElementById("txInfo").innerText = "";
             document.getElementById("breakdown").innerText = "";
           }
         };
