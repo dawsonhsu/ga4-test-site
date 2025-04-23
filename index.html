@@ -11,6 +11,7 @@
     input, select { width: 300px; padding: 5px; }
     #qrcode, #payloadOutput, #breakdown, #verifyResult, #txInfo { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
     #uploadSection { margin-top: 2em; }
+    #accountWarning { color: red; font-weight: bold; margin-top: 0.5em; }
   </style>
 </head>
 <body>
@@ -27,6 +28,7 @@
       </select>
     </label>
     <label>銀行帳號（account number）<input id="accountNumber" required></label>
+    <div id="accountWarning"></div>
     <label>帳戶名稱（請使用英文大寫無聲調）<input id="accountName" required></label>
     <label>金額（VND，可選）<input id="amount" type="number"></label>
     <label>附言（可選）<input id="message"></label>
@@ -117,6 +119,16 @@
       }
       return `📋 解析轉帳資訊：\n銀行代碼: ${bankCode}\n銀行帳號: ${account}\n金額(VND): ${amount || '（無）'}\n附言: ${message || '（無）'}`;
     }
+
+    document.getElementById("accountNumber").addEventListener("input", () => {
+      const acct = document.getElementById("accountNumber").value.trim();
+      const warning = document.getElementById("accountWarning");
+      if (acct.length < 9 || acct.length > 15) {
+        warning.innerText = "⚠️ 建議銀行帳號長度為 9～15 碼，否則可能導致 VietQR 掃碼失敗。";
+      } else {
+        warning.innerText = "";
+      }
+    });
 
     document.getElementById("qrForm").addEventListener("submit", function(e) {
       e.preventDefault();
