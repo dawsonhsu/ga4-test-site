@@ -68,17 +68,27 @@
     }
 
     const BIN_PREFIX_MAP = {
-      '970415': '0112', // VietinBank
-      '970418': '003',  // BIDV (example)
-      '970407': '06',   // Techcombank (example)
-      // 可擴充更多銀行
+      '970415': '0112',
+      '970418': '003',
+      '970407': '06'
     };
+
+    function getBankName(bin) {
+      switch (bin) {
+        case '970415': return 'VietinBank';
+        case '970418': return 'BIDV';
+        case '970407': return 'Techcombank';
+        case '970436': return 'Vietcombank';
+        case '970422': return 'MB Bank';
+        case '970405': return 'Agribank';
+        default: return '此銀行';
+      }
+    }
 
     document.getElementById("accountNumber").addEventListener("input", () => {
       const acct = document.getElementById("accountNumber").value.trim();
       const warning = document.getElementById("accountWarning");
       const prefix = document.getElementById("prefixSuggestion");
-
       const bin = document.getElementById("bankCode").value;
       const suggest = BIN_PREFIX_MAP[bin] || "";
 
@@ -95,17 +105,47 @@
       }
     });
 
-    function getBankName(bin) {
-      switch (bin) {
-        case '970415': return 'VietinBank';
-        case '970418': return 'BIDV';
-        case '970407': return 'Techcombank';
-        case '970436': return 'Vietcombank';
-        case '970422': return 'MB Bank';
-        case '970405': return 'Agribank';
-        default: return '此銀行';
+    document.getElementById("qrForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      const bankCode = document.getElementById("bankCode").value.trim();
+      const account = document.getElementById("accountNumber").value.trim();
+      const name = document.getElementById("accountName").value.trim().toUpperCase();
+      const amount = document.getElementById("amount").value.trim();
+      const message = document.getElementById("message").value.trim();
+
+      const payload = [];
+      payload.push("000201");
+      payload.push("010212");
+
+      const fullAcct = `0006${bankCode}${account}`;
+      const tag00 = "0010A000000727";
+      const tag01 = `01${padLength(fullAcct.length)}${fullAcct}`;
+      const value38 = `${tag00}${tag01}`;
+      payload.push(`38${padLength(value38.length)}${value38}`);
+
+      payload.push("0208QRIBFTTA");
+      payload.push("5303704");
+      if (amount) payload.push(`54${padLength(amount.length)}${amount}`);
+      payload.push("5802VN");
+
+      if (message) {
+        const messageTag = `05${padLength(message.length)}${message}`;
+        payload.push(`62${padLength(messageTag.length)}${messageTag}`);
       }
-    }
+
+      let base = payload.join("");
+      base += "6304";
+      const checksum = crc16(base);
+      base += checksum;
+
+      document.getElementById("qrcode").innerHTML = "";
+      QRCode.toCanvas(document.createElement("canvas"), base, { width: 256 }, function (err, canvas) {
+        if (!err) document.getElementById("qrcode").appendChild(canvas);
+      });
+
+      document.getElementById("payloadOutput").innerText = `🧾 Payload:\n${base}`;
+      document.getElementById("verifyResult").innerText = `✅ CRC 檢查：${crc16(base.slice(0, -4)) === base.slice(-4) ? '通過' : '❌ 錯誤'}\n實際：${base.slice(-4)}\n計算：${crc16(base.slice(0, -4))}`;
+    });
   </script>
 </body>
 </html>
