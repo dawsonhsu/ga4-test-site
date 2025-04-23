@@ -95,18 +95,21 @@
         const len = parseInt(payload.substr(pos + 2, 2), 10);
         const value = payload.substr(pos + 4, len);
         if (tag === "38") {
-          const subTag01Index = value.indexOf("01");
-          const subTag01Len = parseInt(value.substr(subTag01Index + 2, 2));
-          const full = value.substr(subTag01Index + 4, subTag01Len);
-          bankCode = full.substr(4, 6);
-          account = full.substr(10);
+          const acctIndex = value.indexOf("0006");
+          if (acctIndex >= 0) {
+            bankCode = value.substr(acctIndex + 4, 6);
+            account = value.substr(acctIndex + 10);
+          }
         }
         if (tag === "54") amount = value;
         if (tag === "62") {
-          const msgIndex = value.indexOf("05");
-          if (msgIndex >= 0) {
-            const msgLen = parseInt(value.substr(msgIndex + 2, 2));
-            message = value.substr(msgIndex + 4, msgLen);
+          let subPos = 0;
+          while (subPos < value.length) {
+            const subTag = value.substr(subPos, 2);
+            const subLen = parseInt(value.substr(subPos + 2, 2));
+            const subVal = value.substr(subPos + 4, subLen);
+            if (subTag === "05") message = subVal;
+            subPos += 4 + subLen;
           }
         }
         pos += 4 + len;
