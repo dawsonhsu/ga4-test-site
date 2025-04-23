@@ -2,89 +2,73 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NAPAS QR 測試產生器</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+  <title>VietQR Quick Link 生成器</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 2em; }
-    input, button { padding: 10px; margin: 5px 0; width: 300px; }
-    #qrcode { margin-top: 2em; }
-    textarea { width: 100%; height: 100px; margin-top: 1em; }
+    body { font-family: Arial, sans-serif; padding: 2em; max-width: 600px; margin: auto; }
+    input, select, button { width: 100%; padding: 10px; margin-top: 10px; }
+    img { margin-top: 20px; max-width: 100%; border: 1px solid #ccc; padding: 10px; }
+    textarea { width: 100%; height: 60px; margin-top: 10px; }
   </style>
 </head>
 <body>
-  <h2>NAPAS QR Code 測試生成器</h2>
+  <h2>🇻🇳 VietQR Quick Link 圖片生成器</h2>
+  
+  <label>銀行代碼（BANK_ID，例如 970415 或 vietinbank）</label>
+  <input id="bankId" value="970415" placeholder="970415 或 vietinbank 或 ICB">
 
-  <label>BIN（銀行代碼）</label><br>
-  <input id="bin" value="970415"><br>
+  <label>帳號（ACCOUNT_NO）</label>
+  <input id="accountNo" value="113366668888" placeholder="收款帳號">
 
-  <label>銀行帳號</label><br>
-  <input id="account" value="01121098786525"><br>
+  <label>選擇樣式（TEMPLATE）</label>
+  <select id="template">
+    <option value="compact2">compact2（含轉帳資訊）</option>
+    <option value="compact">compact（中等資訊）</option>
+    <option value="qr_only">qr_only（僅 QR）</option>
+    <option value="print">print（完整資訊）</option>
+  </select>
 
-  <label>金額（VND）</label><br>
-  <input id="amount" value="1650000"><br>
+  <label>金額（AMOUNT，可選）</label>
+  <input id="amount" type="number" placeholder="轉帳金額 VND">
 
-  <label>附言（如訂單號）</label><br>
-  <input id="description" value="TX2024-0001"><br>
+  <label>附言（DESCRIPTION，可選）</label>
+  <input id="description" placeholder="如：Mua hang, Thanh toan">
 
-  <button onclick="generateQR()">產生 QR Code</button>
+  <label>收款人名稱（ACCOUNT_NAME，可選）</label>
+  <input id="accountName" placeholder="顯示在圖片上的名稱">
 
-  <div id="qrcode"></div>
-  <label>📦 Payload:</label>
-  <textarea id="payloadBox" readonly></textarea>
+  <button onclick="generateQuickLink()">產生 Quick Link 圖片</button>
+
+  <label>🔗 Quick Link URL:</label>
+  <textarea id="quicklinkUrl" readonly></textarea>
+
+  <img id="qrImage" src="" alt="VietQR Image Preview" style="display:none">
 
   <script>
-    function pad(n) {
-      return n.toString().padStart(2, '0');
-    }
-
-    function crc16(str) {
-      let crc = 0xFFFF;
-      for (let i = 0; i < str.length; i++) {
-        crc ^= str.charCodeAt(i) << 8;
-        for (let j = 0; j < 8; j++) {
-          crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
-        }
-        crc &= 0xFFFF;
-      }
-      return crc.toString(16).toUpperCase().padStart(4, '0');
-    }
-
-    function generateQR() {
-      const bin = document.getElementById('bin').value.trim();
-      const acct = document.getElementById('account').value.trim();
+    function generateQuickLink() {
+      const bankId = document.getElementById('bankId').value.trim();
+      const accountNo = document.getElementById('accountNo').value.trim();
+      const template = document.getElementById('template').value;
       const amount = document.getElementById('amount').value.trim();
-      const desc = document.getElementById('description').value.trim();
+      const description = document.getElementById('description').value.trim();
+      const accountName = document.getElementById('accountName').value.trim();
 
-      const aid = '0010A000000727';
-      const acctRaw = `0006${bin}${acct}`;
-      const acctTag = `01${pad(acctRaw.length)}${acctRaw}`;
-      const merchantInfo = `${aid}${acctTag}`;
-
-      const tags = [];
-      tags.push('000201'); // Format Indicator
-      tags.push('010212'); // Static QR
-      tags.push(`38${pad(merchantInfo.length)}${merchantInfo}`); // Merchant Account Info
-      tags.push('0208QRIBFTTA'); // Merchant Code
-      tags.push('5303704'); // Currency: VND
-      if (amount) tags.push(`54${pad(amount.length)}${amount}`);
-      tags.push('5802VN'); // Country Code
-
-      if (desc) {
-        const subTag = `05${pad(desc.length)}${desc}`;
-        tags.push(`62${pad(subTag.length)}${subTag}`);
+      if (!bankId || !accountNo) {
+        alert('請輸入銀行代碼與帳號');
+        return;
       }
 
-      let payload = tags.join('') + '6304';
-      const crc = crc16(payload);
-      payload += crc;
+      let url = `https://img.vietqr.io/image/${bankId}-${accountNo}-${template}.png`;
+      const params = new URLSearchParams();
+      if (amount) params.append('amount', amount);
+      if (description) params.append('addInfo', encodeURIComponent(description));
+      if (accountName) params.append('accountName', encodeURIComponent(accountName));
 
-      document.getElementById('payloadBox').value = payload;
+      if (params.toString()) url += `?${params.toString()}`;
 
-      document.getElementById('qrcode').innerHTML = '';
-      const canvas = document.createElement('canvas');
-      QRCode.toCanvas(canvas, payload, { width: 256 }, function (err) {
-        if (!err) document.getElementById('qrcode').appendChild(canvas);
-      });
+      document.getElementById('quicklinkUrl').value = url;
+      const img = document.getElementById('qrImage');
+      img.src = url;
+      img.style.display = 'block';
     }
   </script>
 </body>
