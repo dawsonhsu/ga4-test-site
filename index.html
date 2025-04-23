@@ -9,7 +9,7 @@
     body { font-family: sans-serif; padding: 2em; }
     label { display: block; margin-top: 1em; }
     input, select { width: 300px; padding: 5px; }
-    #qrcode, #payloadOutput, #breakdown, #verifyResult, #txInfo { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
+    #qrcode, #payloadOutput, #breakdown, #verifyResult, #txInfo, #structureError { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
     #uploadSection { margin-top: 2em; }
     #accountWarning { color: red; font-weight: bold; margin-top: 0.5em; }
   </style>
@@ -38,6 +38,7 @@
   <div id="qrcode"></div>
   <div id="payloadOutput"></div>
   <div id="verifyResult"></div>
+  <div id="structureError"></div>
   <div id="txInfo"></div>
   <div id="breakdown"></div>
 
@@ -92,15 +93,26 @@
       let amount = "";
       let message = "";
       let pos = 0;
+      let structureError = "";
       while (pos < payload.length) {
         const tag = payload.substr(pos, 2);
         const len = parseInt(payload.substr(pos + 2, 2), 10);
         const value = payload.substr(pos + 4, len);
         if (tag === "38") {
-          const acctIndex = value.indexOf("0006");
+          const tag00 = value.substr(0, 16);
+          const tag01Len = parseInt(value.substr(16 + 2, 2));
+          const tag01Val = value.substr(16 + 4, tag01Len);
+          if (!/^0006[0-9]{6}/.test(tag01Val)) {
+            structureError = "⚠️ 銀行帳號段格式不正確（應為 0006+BIN+帳號）";
+          }
+          const acctIndex = tag01Val.indexOf("0006");
           if (acctIndex >= 0) {
-            bankCode = value.substr(acctIndex + 4, 6);
-            account = value.substr(acctIndex + 10);
+            bankCode = tag01Val.substr(acctIndex + 4, 6);
+            account = tag01Val.substr(acctIndex + 10);
+            const actualLen = tag01Val.length;
+            if (actualLen !== tag01Len) {
+              structureError = `⚠️ 帳號段長度錯誤：聲稱 ${tag01Len}，實際 ${actualLen}`;
+            }
           }
         }
         if (tag === "54") amount = value;
@@ -117,6 +129,7 @@
         pos += 4 + len;
         if (tag === "63") break;
       }
+      document.getElementById("structureError").innerText = structureError;
       return `📋 解析轉帳資訊：\n銀行代碼: ${bankCode}\n銀行帳號: ${account}\n金額(VND): ${amount || '（無）'}\n附言: ${message || '（無）'}`;
     }
 
