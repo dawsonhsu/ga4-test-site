@@ -2,150 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>NAPAS VietQR 生成器</title>
+  <title>NAPAS QR 測試產生器</title>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <style>
-    body { font-family: sans-serif; padding: 2em; }
-    label { display: block; margin-top: 1em; }
-    input, select { width: 300px; padding: 5px; }
-    #qrcode, #payloadOutput, #breakdown, #verifyResult, #txInfo, #structureError { margin-top: 2em; white-space: pre-wrap; font-family: monospace; background: #f8f8f8; padding: 1em; border-radius: 8px; }
-    #uploadSection { margin-top: 2em; }
-    #accountWarning, #prefixSuggestion { color: red; font-weight: bold; margin-top: 0.5em; }
+    body { font-family: Arial, sans-serif; padding: 2em; }
+    input, button { padding: 10px; margin: 5px 0; width: 300px; }
+    #qrcode { margin-top: 2em; }
+    textarea { width: 100%; height: 100px; margin-top: 1em; }
   </style>
 </head>
 <body>
-  <h2>NAPAS / VietQR Code 生成器</h2>
-  <form id="qrForm">
-    <label>銀行代碼：
-      <select id="bankCode" required>
-        <option value="970415">VietinBank</option>
-        <option value="970436">Vietcombank</option>
-        <option value="970418">Techcombank</option>
-        <option value="970407">BIDV</option>
-        <option value="970422">MB Bank</option>
-        <option value="970405">Agribank</option>
-      </select>
-    </label>
-    <label>銀行帳號（account number）<input id="accountNumber" required></label>
-    <div id="accountWarning"></div>
-    <div id="prefixSuggestion"></div>
-    <label>帳戶名稱（請使用英文大寫無聲調）<input id="accountName" required></label>
-    <label>金額（VND，可選）<input id="amount" type="number"></label>
-    <label>附言（可選）<input id="message"></label>
-    <button type="submit">生成 QR Code</button>
-  </form>
+  <h2>NAPAS QR Code 測試生成器</h2>
+
+  <label>BIN（銀行代碼）</label><br>
+  <input id="bin" value="970415"><br>
+
+  <label>銀行帳號</label><br>
+  <input id="account" value="01121098786525"><br>
+
+  <label>金額（VND）</label><br>
+  <input id="amount" value="1650000"><br>
+
+  <label>附言（如訂單號）</label><br>
+  <input id="description" value="TX2024-0001"><br>
+
+  <button onclick="generateQR()">產生 QR Code</button>
 
   <div id="qrcode"></div>
-  <div id="payloadOutput"></div>
-  <div id="verifyResult"></div>
-  <div id="structureError"></div>
-  <div id="txInfo"></div>
-  <div id="breakdown"></div>
-
-  <div id="uploadSection">
-    <h3>🖼️ 上傳 QR 圖片解析：</h3>
-    <input type="file" id="qrImageInput" accept="image/*">
-    <canvas id="qrCanvas" style="display:none;"></canvas>
-  </div>
+  <label>📦 Payload:</label>
+  <textarea id="payloadBox" readonly></textarea>
 
   <script>
-    function padLength(n) {
+    function pad(n) {
       return n.toString().padStart(2, '0');
     }
 
-    function crc16(payload) {
+    function crc16(str) {
       let crc = 0xFFFF;
-      for (let i = 0; i < payload.length; i++) {
-        crc ^= payload.charCodeAt(i) << 8;
+      for (let i = 0; i < str.length; i++) {
+        crc ^= str.charCodeAt(i) << 8;
         for (let j = 0; j < 8; j++) {
-          if ((crc & 0x8000) !== 0) crc = (crc << 1) ^ 0x1021;
-          else crc <<= 1;
+          crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
         }
         crc &= 0xFFFF;
       }
       return crc.toString(16).toUpperCase().padStart(4, '0');
     }
 
-    const BIN_PREFIX_MAP = {
-      '970415': '0112',
-      '970418': '003',
-      '970407': '06'
-    };
+    function generateQR() {
+      const bin = document.getElementById('bin').value.trim();
+      const acct = document.getElementById('account').value.trim();
+      const amount = document.getElementById('amount').value.trim();
+      const desc = document.getElementById('description').value.trim();
 
-    function getBankName(bin) {
-      switch (bin) {
-        case '970415': return 'VietinBank';
-        case '970418': return 'BIDV';
-        case '970407': return 'Techcombank';
-        case '970436': return 'Vietcombank';
-        case '970422': return 'MB Bank';
-        case '970405': return 'Agribank';
-        default: return '此銀行';
-      }
-    }
+      const aid = '0010A000000727';
+      const acctRaw = `0006${bin}${acct}`;
+      const acctTag = `01${pad(acctRaw.length)}${acctRaw}`;
+      const merchantInfo = `${aid}${acctTag}`;
 
-    document.getElementById("accountNumber").addEventListener("input", () => {
-      const acct = document.getElementById("accountNumber").value.trim();
-      const warning = document.getElementById("accountWarning");
-      const prefix = document.getElementById("prefixSuggestion");
-      const bin = document.getElementById("bankCode").value;
-      const suggest = BIN_PREFIX_MAP[bin] || "";
+      const tags = [];
+      tags.push('000201'); // Format Indicator
+      tags.push('010212'); // Static QR
+      tags.push(`38${pad(merchantInfo.length)}${merchantInfo}`); // Merchant Account Info
+      tags.push('0208QRIBFTTA'); // Merchant Code
+      tags.push('5303704'); // Currency: VND
+      if (amount) tags.push(`54${pad(amount.length)}${amount}`);
+      tags.push('5802VN'); // Country Code
 
-      if (acct.length < 9 || acct.length > 15) {
-        warning.innerText = "⚠️ 建議銀行帳號長度為 9～15 碼，否則可能導致 VietQR 掃碼失敗。";
-      } else {
-        warning.innerText = "";
+      if (desc) {
+        const subTag = `05${pad(desc.length)}${desc}`;
+        tags.push(`62${pad(subTag.length)}${subTag}`);
       }
 
-      if (acct.length <= 10 && suggest && !acct.startsWith(suggest)) {
-        prefix.innerText = `💡 提示：${getBankName(bin)} 通常帳號會以「${suggest}」開頭，可能需要補上。`;
-      } else {
-        prefix.innerText = "";
-      }
-    });
+      let payload = tags.join('') + '6304';
+      const crc = crc16(payload);
+      payload += crc;
 
-    document.getElementById("qrForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-      const bankCode = document.getElementById("bankCode").value.trim();
-      const account = document.getElementById("accountNumber").value.trim();
-      const name = document.getElementById("accountName").value.trim().toUpperCase();
-      const amount = document.getElementById("amount").value.trim();
-      const message = document.getElementById("message").value.trim();
+      document.getElementById('payloadBox').value = payload;
 
-      const payload = [];
-      payload.push("000201");
-      payload.push("010212");
-
-      const fullAcct = `0006${bankCode}${account}`;
-      const tag00 = "0010A000000727";
-      const tag01 = `01${padLength(fullAcct.length)}${fullAcct}`;
-      const value38 = `${tag00}${tag01}`;
-      payload.push(`38${padLength(value38.length)}${value38}`);
-
-      payload.push("0208QRIBFTTA");
-      payload.push("5303704");
-      if (amount) payload.push(`54${padLength(amount.length)}${amount}`);
-      payload.push("5802VN");
-
-      if (message) {
-        const messageTag = `05${padLength(message.length)}${message}`;
-        payload.push(`62${padLength(messageTag.length)}${messageTag}`);
-      }
-
-      let base = payload.join("");
-      base += "6304";
-      const checksum = crc16(base);
-      base += checksum;
-
-      document.getElementById("qrcode").innerHTML = "";
-      QRCode.toCanvas(document.createElement("canvas"), base, { width: 256 }, function (err, canvas) {
-        if (!err) document.getElementById("qrcode").appendChild(canvas);
+      document.getElementById('qrcode').innerHTML = '';
+      const canvas = document.createElement('canvas');
+      QRCode.toCanvas(canvas, payload, { width: 256 }, function (err) {
+        if (!err) document.getElementById('qrcode').appendChild(canvas);
       });
-
-      document.getElementById("payloadOutput").innerText = `🧾 Payload:\n${base}`;
-      document.getElementById("verifyResult").innerText = `✅ CRC 檢查：${crc16(base.slice(0, -4)) === base.slice(-4) ? '通過' : '❌ 錯誤'}\n實際：${base.slice(-4)}\n計算：${crc16(base.slice(0, -4))}`;
-    });
+    }
   </script>
 </body>
 </html>
